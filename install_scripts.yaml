@@ -1,0 +1,22 @@
+- name: Check if marker file exists
+  stat:
+    path: "{{ target_home }}/.local/share/{{ target_user }}-ansible/markers/{{ script_item.name }}"
+  register: marker_file
+
+- name: Run install script if not already installed
+  shell: |
+    set -euo pipefail
+    curl -LsSf {{ script_item.url }} | {{ script_item.shell | default("bash") }}
+  args:
+    executable: /bin/bash
+  become: "{{ script_item.become | default(true) }}"
+  when: not marker_file.stat.exists
+
+- name: Write marker file
+  copy:
+    dest: "{{ target_home }}/.local/share/{{ target_user }}-ansible/markers/{{ script_item.name }}"
+    content: "installed\n"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: '0644'
+  when: not marker_file.stat.exists

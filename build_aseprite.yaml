@@ -1,0 +1,89 @@
+- name: Install dependencies
+  dnf:
+    name:
+      - "@development-tools"
+      - gcc
+      - gcc-c++
+      - git
+      - cmake
+      - ninja-build
+      - xcb-util
+    state: present
+
+- name: Ensure required directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: '0755'
+  loop:
+    - "{{ target_home }}/.local/share/aseprite"
+    - "{{ target_home }}/.local/bin"
+    - "{{ target_home }}/.local/share/applications"
+
+- name: Clone Aseprite repo
+  git:
+    repo: "https://github.com/aseprite/aseprite.git"
+    dest: "/tmp/aseprite"
+    recursive: yes
+    update: yes
+  become: yes
+  become_user: "{{ target_user }}"
+
+- name: Build Aseprite
+  shell: |
+    set -euo pipefail
+    cd /tmp/aseprite
+    bash build.sh --auto
+  args:
+    chdir: /tmp/aseprite
+    creates: "/tmp/aseprite/build/bin/aseprite"  # prevents rebuilds
+  become: yes
+  become_user: "{{ target_user }}"
+
+- name: Install Aseprite binaries
+  copy:
+    src: "/tmp/aseprite/build/bin/"
+    dest: "{{ target_home }}/.local/share/aseprite/"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: '0755'
+  become: yes
+  become_user: "{{ target_user }}"
+
+- name: Create aseprite symlink
+  file:
+    src: "{{ target_home }}/.local/share/aseprite/aseprite"
+    dest: "{{ target_home }}/.local/bin/aseprite"
+    state: link
+    force: yes
+  become: yes
+  become_user: "{{ target_user }}"
+
+- name: Create aseprite.desktop file
+  copy:
+    dest: "{{ target_home }}/.local/share/applications/aseprite.desktop"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: '0644'
+    content: |
+      [Desktop Entry]
+      Type=Application
+      Encoding=UTF-8
+      Name=Aseprite
+      GenericName=Sprite Editor
+      Comment=Animated sprite editor & pixel art tool
+      Icon={{ target_home }}/.local/share/aseprite/data/icons/ase64.png
+      Categories=Graphics;2DGraphics;RasterGraphics;
+      Exec={{ target_home }}/.local/share/aseprite/aseprite %U
+      TryExec={{ target_home }}/.local/share/aseprite/aseprite
+      Terminal=false
+      StartupNotify=false
+      StartupWMClass=allegro
+      MimeType=image/bmp;image/gif;image/jpeg;image/png;image/x-pcx;image/x-tga;image/vnd.microsoft.icon;video/x-flic;image/webp;image/x-aseprite;
+
+- name: Clean up temporary repo
+  file:
+    path: /tmp/aseprite
+    state: absent

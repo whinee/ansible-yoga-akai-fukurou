@@ -1,0 +1,149 @@
+# - name: Enable DNF Copr Repositories
+#   community.general.copr:
+#     name: "{{ item }}"
+#     state: enabled
+#   loop: "{{ copr_repos }}"
+#   ignore_errors: yes
+#   register: copr_results
+
+# - name: Add special repos via repo files or URLs
+#   block:
+#     - name: Cloudflared repo
+#       get_url:
+#         url: https://pkg.cloudflare.com/cloudflared-ascii.repo
+#         dest: /etc/yum.repos.d/cloudflared.repo
+#         mode: '0644'
+
+#     - name: Download Docker CE repo file
+#       get_url:
+#         url: https://download.docker.com/linux/fedora/docker-ce.repo
+#         dest: /etc/yum.repos.d/docker-ce.repo
+#         mode: '0644'
+
+#     - name: VS Code repo
+#       block:
+#         - rpm_key:
+#             state: present
+#             key: https://packages.microsoft.com/keys/microsoft.asc
+
+#         - copy:
+#             content: |
+#               [code]
+#               name=Visual Studio Code
+#               baseurl=https://packages.microsoft.com/yumrepos/vscode
+#               enabled=1
+#               autorefresh=1
+#               type=rpm-md
+#               gpgcheck=1
+#               gpgkey=https://packages.microsoft.com/keys/microsoft.asc
+#             dest: /etc/yum.repos.d/vscode.repo
+#             mode: '0644'
+#   become: yes
+
+# - name: Enable repo sections
+#   community.general.ini_file:
+#     path: "/etc/yum.repos.d/{{ item.0.key }}.repo"
+#     section: "{{ item.1 }}"
+#     option: enabled
+#     value: "1"
+#     create: no
+#   loop: "{{ yum_repos | dict2items | subelements('value') }}"
+#   loop_control:
+#     label: "{{ item.1 }}"
+
+# - name: Install RPM URLs
+#   dnf:
+#     name: "{{ item }}"
+#     state: present
+#     disable_gpg_check: true
+#   when: item | length > 0
+#   loop: "{{ rpm_urls }}"
+
+# - name: Refresh DNF cache
+#   dnf:
+#     update_cache: yes
+
+# - name: Fetch release metadata (authenticated, with retries)
+#   uri:
+#     url: >-
+#       https://api.github.com/repos/{{ item.repo }}/releases/{{
+#         'latest' if (item.tag is not defined or item.tag == 'latest')
+#         else 'tags/' ~ item.tag
+#       }}
+#     method: GET
+#     headers:
+#       Accept: "application/vnd.github.v3+json"
+#       User-Agent: "ansible-playbook/{{ target_user }}"
+#     return_content: yes
+#     status_code: [200,304]
+#   register: release_resp
+#   retries: 3
+#   delay: 10
+#   until: release_resp.status in [200,304]
+#   loop: "{{ github_rpm_packages }}"
+#   loop_control:
+#     label: "{{ item.name }}"
+
+# - name: If we got 200, extract asset URL; if 304, use previously cached URL
+#   set_fact:
+#     "{{ item.item.name | replace('-', '_') }}_url": >-
+#       {{ (item.json.assets | selectattr('name','match','.*x86_64.*rpm$') | map(attribute='browser_download_url') | list | last) if item.status == 200 else (lookup('file', '{{ target_home }}/.local/share/{{ target_user }}-ansible/cache/github-releases/{{ item.item.name }}.url', errors='ignore') | default('')) }}
+#   loop: "{{ release_resp.results }}"
+
+# - name: Build cached_urls list
+#   set_fact:
+#     cached_urls: >-
+#       {{
+#         cached_urls | default([]) +
+#         [{
+#           'name': item.name,
+#           'url': vars[item.name | replace('-', '_') ~ '_url'] | default('')
+#         }]
+#       }}
+#   loop: "{{ github_rpm_packages }}"
+
+# - name: Install RPM if cached URL found
+#   dnf:
+#     name: "{{ item.url }}"
+#     state: present
+#     disable_gpg_check: true
+#   when: item.url | length > 0
+#   loop: "{{ cached_urls }}"
+#   loop_control:
+#     label: "{{ item.name }}"
+
+# - name: Ensure multimedia codecs and drivers are configured
+#   block:
+#     - name: Gather installed packages
+#       package_facts:
+
+#     - name: Update Multimedia group
+#       dnf:
+#         name: "@multimedia"
+#         state: latest
+#         allowerasing: true
+#         exclude: "PackageKit-gstreamer-plugin"
+#         install_weak_deps: false
+#         skip_broken: true
+
+#     - name: Swap ffmpeg-free with ffmpeg
+#       command: dnf swap -y ffmpeg-free ffmpeg --allowerasing
+#       when: "'ffmpeg-free' in ansible_facts.packages"
+
+#     - name: Swap mesa-va-drivers with mesa-va-drivers-freeworld
+#       command: dnf swap -y mesa-va-drivers mesa-va-drivers-freeworld
+#       when: "'mesa-va-drivers' in ansible_facts.packages"
+
+#     - name: Swap mesa-vdpau-drivers with mesa-vdpau-drivers-freeworld
+#       command: dnf swap -y mesa-vdpau-drivers mesa-vdpau-drivers-freeworld
+#       when: "'mesa-vdpau-drivers' in ansible_facts.packages"
+
+
+- name: Install main packages
+  ansible.builtin.dnf:
+    name: "{{ dnf_packages }}"
+    state: present
+    disable_gpg_check: yes  # Optional if some packages are unsigned
+    skip_broken: yes
+    exclude: "{{ dnf_exclude_packages }}"
+  become: yes
