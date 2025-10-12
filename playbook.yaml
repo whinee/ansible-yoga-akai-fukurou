@@ -9,12 +9,41 @@
       - markers
       - cache/github-releases
 
+    target_first_citizen_folders:
+      - path: /etc/pipewire/filter-chain.conf.d/
+        mode: '0644'
+        owner: root
+        group: root
+
     first_citizen_files:
       - src: assets/files/etc/dnf/dnf.conf
         dest: /etc/dnf/dnf.conf
         mode: '0644'
         owner: root
         group: root
+      - src: assets/files/etc/pipewire/filter-chain.conf.d/deepfilter-mono-source.conf
+        dest: /etc/pipewire/filter-chain.conf.d/deepfilter-mono-source.conf
+        mode: '0644'
+        owner: root
+        group: root
+
+    user_files:
+      - src: assets/files/home/target_user/i3/config.j2
+        dest: ~/.xprofile
+        mode: '0644'
+        type: template
+
+      - src: assets/files/home/target_user/.bashrc
+        dest: "{{ target_home }}/.bashrc"
+        mode: '0644'
+
+      - src: assets/files/home/target_user/.profile
+        dest: "{{ target_home }}/.profile"
+        mode: '0644'
+
+      - src: assets/files/home/target_user/.gitconfig
+        dest: "{{ target_home }}/.gitconfig"
+        mode: '0644'
 
     snap_packages:
       - obsidian
@@ -59,39 +88,41 @@
     dnf_packages:
       - adwaita-icon-theme
       - ansible-core
-      - aria2
-      - bottom
-      - btrfs-assistant
+      # - arandr
+      - aria2 # Download Utility
+      - bottom # TUI System Monitor
+      - btrfs-assistant # BTRFS Utilities and Snapshot
       - cloudflared
-      - docker-ce
+      # [START] Docker
+      - docker-ce 
       - docker-ce-cli
       - containerd.io
       - docker-buildx-plugin
       - docker-compose-plugin
-      - kicad
-      - lm_sensors
-      - dnf5-plugin-automatic
-      - pcp
-      - python3-pcp
-      - pcp-selinux
+      # [END] Docker
       - code
       - curl
       - dnf-plugins-core
+      # [START] Easyeffects
       - easyeffects
       - lsp-plugins
-      - fastfetch
+      # [END] Easyeffects
+      - fastfetch # System Information
       - feh
-      - flameshot
+      - flameshot # Screenshot
       - fonts-tweak-tool
-      - gcolor3
+      - gcolor3 # Color picker
+      # [START] Virtual Machines runner
       - gnome-boxes
       - qemu
       - virt-install
       - virt-viewer
-      - gnome-keyring
+      # [END] Virtual Machines runner
+      - gnome-keyring # Secrets Store
       - gnome-tweaks
       - gimp
       - gparted
+      # [START] Fedora Multimedia Codecs
       - gstreamer1-plugins-base
       - gstreamer1-plugins-bad-free
       - gstreamer1-plugin-dav1d
@@ -100,11 +131,14 @@
       - gstreamer1-libav
       - gstreamer1-plugin-openh264
       - libavcodec-freeworld
+      # [END] Fedora Multimedia Codecs
       - gtk-murrine-engine
-      - gvfs-mtp
+      - gvfs-mtp # Media Transfer Protocol FS support for mobile devices
+      - intel-media-driver
       - java-latest-openjdk
-      - just
-      - keepassxc
+      - just # Just a Command Runner
+      - keepassxc # Password Manager
+      - kicad
       - mpv
       - nmap
       - nodejs
@@ -141,22 +175,13 @@
       - zbar
 
     shell_scripts_install:
-      - name: "uv"
-        url: "https://astral.sh/uv/install.sh"
-        shell: "sh"
+      - name: uv
+        url: https://astral.sh/uv/install.sh
+        shell: sh
+      - name: cronicle
+        url: https://raw.githubusercontent.com/jhuckaby/Cronicle/master/bin/install.js
+        shell: node
 
-    # user_files:
-    #   - src: assets/files/home/target_user/.bashrc
-    #     dest: "{{ target_home }}/.bashrc"
-    #     mode: '0644'
-
-    #   - src: assets/files/home/target_user/.profile
-    #     dest: "{{ target_home }}/.profile"
-    #     mode: '0644'
-
-    #   - src: assets/files/home/target_user/.gitconfig
-    #     dest: "{{ target_home }}/.gitconfig"
-    #     mode: '0644'
   handlers: []
   tasks:
     - name: Ensure ansible folders exist
@@ -167,23 +192,40 @@
         group: "{{ target_user }}"
         mode: '0755'
       loop: "{{ target_user_ansible_folders }}"
+      loop_control:
+        label: "{{ item }}"
 
-    # - name: Enable and start sshd
-    #   systemd:
-    #     name: sshd
-    #     state: started
-    #     enabled: true
+    - name: Make multiple first citizen folders
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        mode: "{{ item.mode }}"
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.group | default('root') }}"
+      loop: "{{ target_first_citizen_folders }}"
+      loop_control:
+        label: "{{ item.path }}"
+      
+    - name: Copy multiple first citizen files async
+      copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: "{{ item.mode }}"
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.group | default('root') }}"
+      loop: "{{ first_citizen_files }}"
+      loop_control:
+        label: "{{ item.dest }}"
 
-    # - name: Copy multiple first citizen files async
-    #   copy:
-    #     src: "{{ item.src }}"
-    #     dest: "{{ item.dest }}"
-    #     mode: "{{ item.mode }}"
-    #     owner: "{{ item.owner | default('root') }}"
-    #     group: "{{ item.group | default('root') }}"
-    #   loop: "{{ first_citizen_files }}"
-    #   loop_control:
-    #     label: "{{ item.dest }}"
+    - name: Enable and start sshd
+      systemd:
+        name: sshd
+        state: started
+        enabled: true
+
+    - name: Refresh DNF cache
+      dnf:
+        update_cache: yes
 
     - name: Install First-Class Citizen packages
       dnf:
@@ -195,120 +237,104 @@
         ]
         state: present
 
-    # - name: Remove firewalld
-    #   dnf:
-    #     name: firewalld
-    #     state: absent
+    - name: Remove firewalld
+      dnf:
+        name: firewalld
+        state: absent
 
-    # - name: Add Flathub remote if not exists
-    #   community.general.flatpak_remote:
-    #     name: flathub
-    #     state: present
-    #     flatpakrepo_url: https://dl.flathub.org/repo/flathub.flatpakrepo
+    - name: Add Flathub remote if not exists
+      community.general.flatpak_remote:
+        name: flathub
+        state: present
+        flatpakrepo_url: https://dl.flathub.org/repo/flathub.flatpakrepo
 
-    # - name: Ensure /snap symlink exists
-    #   ansible.builtin.file:
-    #     src: /var/lib/snapd/snap
-    #     dest: /snap
-    #     state: link
-
+    - name: Ensure /snap symlink exists
+      ansible.builtin.file:
+        src: /var/lib/snapd/snap
+        dest: /snap
+        state: link
 
     - name: Install Apps
       block:
-        # - name: Install Flatpak Apps
-        #   community.general.flatpak:
-        #     name: "{{ flatpak_packages }}"
-        #     state: present
-        #     remote: flathub
-        #   async: 600
-        #   poll: 0
-        #   register: flatpak_job
+        - name: Install Flatpak Apps
+          community.general.flatpak:
+            name: "{{ flatpak_packages }}"
+            state: present
+            remote: flathub
 
-        # - name: Install Apps via Snap
-        #   community.general.snap:
-        #     name: "{{ snap_packages }}"
-        #     classic: yes
-        #     state: present
-        #   async: 600
-        #   poll: 0
-        #   register: snap_job
-            
-
-        # # Collect them into a list
-        # - name: Set fact with async jobs
-        #   set_fact:
-        #     async_jobs:
-        #       - "{{ flatpak_job }}"
-        #       - "{{ snap_job }}"
-
-        # # Wait for them all
-        # - name: Wait for async jobs to finish
-        #   async_status:
-        #     jid: "{{ item.ansible_job_id }}"
-        #   register: job_result
-        #   until: job_result.finished
-        #   retries: 10
-        #   delay: 10
-        #   loop: "{{ async_jobs }}"
-        #   loop_control:
-        #     label: "{{ item.ansible_job_id }}"
-
-        # - name: Show async job results
-        #   debug:
-        #     var: job_result
+        - name: Install Apps via Snap
+          community.general.snap:
+            name: "{{ snap_packages }}"
+            classic: yes
+            state: present
 
         - name: Install Apps via DNF
           register: dnf_job
           include_tasks: install_dnf_apps.yaml
 
-    # - name: Check for Oh My Bash marker
-    #   ansible.builtin.stat:
-    #     path: "{{ target_home }}/.local/share/{{ target_user }}-ansible/markers/oh-my-bash"
-    #   register: omb_marker
+    - name: Check for Oh My Bash marker
+      ansible.builtin.stat:
+        path: "{{ target_home }}/.local/share/{{ target_user }}-ansible/markers/oh-my-bash"
+      register: omb_marker
 
-    # - name: Remove existing Oh My Bash
-    #   file:
-    #     path: "{{ target_home }}/.oh-my-bash"
-    #     state: absent
-    #   become: yes
-    #   become_user: "{{ target_user }}"
-    #   when: not omb_marker.stat.exists
+    - name: Remove existing Oh My Bash
+      file:
+        path: "{{ target_home }}/.oh-my-bash"
+        state: absent
+      become: yes
+      become_user: "{{ target_user }}"
+      when: not omb_marker.stat.exists
 
-    # - name: Clone Oh My Bash repo
-    #   git:
-    #     repo: https://github.com/ohmybash/oh-my-bash.git
-    #     dest: "{{ target_home }}/.oh-my-bash"
-    #     update: yes
-    #   become: yes
-    #   become_user: "{{ target_user }}"
-    #   when: not omb_marker.stat.exists
+    - name: Clone Oh My Bash repo
+      git:
+        repo: https://github.com/ohmybash/oh-my-bash.git
+        dest: "{{ target_home }}/.oh-my-bash"
+        update: yes
+      become: yes
+      become_user: "{{ target_user }}"
+      when: not omb_marker.stat.exists
 
-    # - name: Write Oh My Bash marker file
-    #   copy:
-    #     dest: "{{ target_home }}/.local/share/{{ target_user }}-ansible/markers/oh-my-bash"
-    #     content: "installed\n"
-    #     owner: "{{ target_user }}"
-    #     group: "{{ target_user }}"
-    #     mode: '0644'
-    #   when: not omb_marker.stat.exists
+    - name: Write Oh My Bash marker file
+      copy:
+        dest: "{{ target_home }}/.local/share/{{ target_user }}-ansible/markers/oh-my-bash"
+        content: "installed\n"
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0644'
+      when: not omb_marker.stat.exists
 
-    # - name: Run install scripts (curl|bash style)
-    #   include_tasks: install_scripts.yaml
-    #   loop: "{{ shell_scripts_install }}"
-    #   loop_control:
-    #     loop_var: script_item
+    - name: Run install scripts (curl|bash style)
+      include_tasks: install_scripts.yaml
+      loop: "{{ shell_scripts_install }}"
+      loop_control:
+        loop_var: script_item
 
-    # - name: Copy multiple user files
-    #   copy:
-    #     src: "{{ item.src }}"
-    #     dest: "{{ item.dest }}"
-    #     mode: "{{ item.mode }}"
-    #     owner: "{{ item.owner | default(target_user) }}"
-    #     group: "{{ item.group | default(target_user) }}"
-    #   become_user: "{{ target_user }}"
-    #   loop: "{{ user_files }}"
-    #   loop_control:
-    #     label: "{{ item.dest }}"
+    - name: Copy or template multiple user files
+      become_user: "{{ target_user }}"
+      block:
+        - name: Handle templated user files
+          template:
+            src: "{{ item.src }}"
+            dest: "{{ item.dest | expanduser }}"
+            mode: "{{ item.mode }}"
+            owner: "{{ item.owner | default(target_user) }}"
+            group: "{{ item.group | default(target_user) }}"
+          when: item.type | default('copy') == 'template'
+          loop: "{{ user_files }}"
+          loop_control:
+            label: "{{ item.dest }}"
+
+        - name: Handle static user files
+          copy:
+            src: "{{ item.src }}"
+            dest: "{{ item.dest | expanduser }}"
+            mode: "{{ item.mode }}"
+            owner: "{{ item.owner | default(target_user) }}"
+            group: "{{ item.group | default(target_user) }}"
+          when: item.type | default('copy') == 'copy'
+          loop: "{{ user_files }}"
+          loop_control:
+            label: "{{ item.dest }}"
 
     - name: Build Aseprite
       include_tasks: build_aseprite.yaml
