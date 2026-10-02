@@ -28,8 +28,8 @@
         group: root
 
     user_files:
-      - src: assets/files/home/target_user/i3/config.j2
-        dest: ~/.xprofile
+      - src: assets/files/home/target_user/.config/i3/config.j2
+        dest: "{{ target_home }}/.config/i3/config"
         mode: '0644'
         type: template
 
@@ -41,9 +41,9 @@
         dest: "{{ target_home }}/.profile"
         mode: '0644'
 
-      - src: assets/files/home/target_user/.gitconfig
-        dest: "{{ target_home }}/.gitconfig"
-        mode: '0644'
+      # - src: assets/files/home/target_user/.gitconfig
+      #   dest: "{{ target_home }}/.gitconfig"
+      #   mode: '0644'
 
     snap_packages:
       - obsidian
@@ -69,15 +69,15 @@
 
     rpm_urls:
       - "https://prerelease.keybase.io/keybase_amd64.rpm"
-      - "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-{{ ansible_facts['distribution_major_version'] }}.noarch.rpm"
-      - "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{{ ansible_facts['distribution_major_version'] }}.noarch.rpm"
+      - "https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-{{ ansible_facts['distribution_major_version'] }}.noarch.rpm"
+      - "https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{{ ansible_facts['distribution_major_version'] }}.noarch.rpm"
       - "https://repo.linrunner.de/fedora/tlp/repos/releases/tlp-release.fc{{ ansible_facts['distribution_major_version'] }}.noarch.rpm"
 
     github_rpm_packages:
       - name: rustdesk
         repo: rustdesk/rustdesk
       - name: youtube-music
-        repo: th-ch/youtube-music
+        repo: pear-devs/pear-desktop
       - name: yaak-app
         repo: mountain-loop/yaak
 
@@ -88,10 +88,11 @@
     dnf_packages:
       - adwaita-icon-theme
       - ansible-core
-      # - arandr
+      - arandr
       - aria2 # Download Utility
       - bottom # TUI System Monitor
       - btrfs-assistant # BTRFS Utilities and Snapshot
+      - clipit
       - cloudflared
       # [START] Docker
       - docker-ce 
@@ -103,6 +104,7 @@
       - code
       - curl
       - dnf-plugins-core
+      - dunst
       # [START] Easyeffects
       - easyeffects
       - lsp-plugins
@@ -137,8 +139,9 @@
       - intel-media-driver
       - java-latest-openjdk
       - just # Just a Command Runner
-      - keepassxc # Password Manager
+      # - keepassxc # Password Manager
       - kicad
+      - miniupnpc-devel
       - mpv
       - nmap
       - nodejs
@@ -178,9 +181,9 @@
       - name: uv
         url: https://astral.sh/uv/install.sh
         shell: sh
-      - name: cronicle
-        url: https://raw.githubusercontent.com/jhuckaby/Cronicle/master/bin/install.js
-        shell: node
+    #   - name: cronicle
+    #     url: https://raw.githubusercontent.com/jhuckaby/Cronicle/master/bin/install.js
+    #     shell: node
 
   handlers: []
   tasks:
@@ -336,5 +339,5 @@
           loop_control:
             label: "{{ item.dest }}"
 
-    - name: Build Aseprite
-      include_tasks: build_aseprite.yaml
+    # - name: Build Aseprite
+    #   include_tasks: build_aseprite.yaml

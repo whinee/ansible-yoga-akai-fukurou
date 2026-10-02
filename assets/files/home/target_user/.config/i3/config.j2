@@ -34,9 +34,22 @@ exec --no-startup-id dex --autostart --environment i3
 # and nm-applet is a desktop environment-independent system tray GUI for it.
 exec --no-startup-id nm-applet
 
+exec --no-startup-id clipit
+exec --no-startup-id dunst
+
 exec --no-startup-id brightnessctl set 96000
-# exec --no-startup-id xrandr --output eDP-1 --mode 1280x800 --pos 1920x116 --rotate normal --output DP-1 --off --output DP-2 --off --output DP-3 --off --output DP-4 --primary --mode 1920x1080 --pos 0x0 --rotate normal
-exec xrandr --dpi 220
+
+{% if ansible_hostname == "yoga-akai-neko" %}
+exec --no-startup-id xrandr --output eDP-1 --primary --mode 1920x1200 --pos 0x0 --rotate normal --dpi 220
+{% elif ansible_hostname == "cezanne-shiroi-neko" %}
+exec --no-startup-id xrandr --output HDMI-A-0 --mode 1920x1080 --pos 1920x0 --rotate normal --rate 100 --output DisplayPort-0 --mode 1920x1080 --pos 0x0 --rotate normal
+exec --no-startup-id i3-msg "workspace 1; append_layout /home/lyra/.config/i3/wp1.json"
+exec --no-startup-id i3-msg "workspace 2; append_layout /home/lyra/.config/i3/wp2.json"
+{% else %}
+exec --no-startup-id xrandr --dpi 96
+{% endif %}
+
+exec --no-startup-id xbindkeys -f /home/lyra/.config/xbindkeys/config
 
 # Use pactl to adjust volume in PulseAudio.
 set $refresh_i3status killall -SIGUSR1 i3status
@@ -207,7 +220,3 @@ client.urgent           #2f343a #900000 #ffffff #900000   #900000
 client.placeholder      #000000 #0c0c0c #ffffff #000000   #0c0c0c
 
 client.background       #ffffff
-
-exec --no-startup-id i3-msg "workspace 1; append_layout $HOME/.config/i3/wp1.json"
-exec --no-startup-id i3-msg "workspace 2; append_layout $HOME/.config/i3/wp2.json"
-exec --no-startup-id xbindkeys -f $HOME/.config/xbindkeys/config

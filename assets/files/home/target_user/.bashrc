@@ -7,11 +7,9 @@ if [ -f $HOME/.profile ]; then
     . $HOME/.profile
 fi
 
-. ~/.config/bash/source.sh
-. ~/.config/bash/init.sh
-. "$HOME/.cargo/env"
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+[ -x /home/linuxbrew/.linuxbrew/bin/brew ] && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 
 # Uncomment the following line if you don't like systemctl's auto-paging feature:
 # export SYSTEMD_PAGER=
@@ -187,19 +185,44 @@ agent_start () {
     . "$SSH_ENV" > /dev/null
 }
 
-agent_load_env
+# Only manage the ssh-agent / ssh-add in interactive sessions. In a
+# non-interactive shell (e.g. tool/automation runners) `ssh-add` blocks
+# waiting for a passphrase on stdin that never arrives, hanging the shell.
+if [[ $- == *i* ]]; then
+    agent_load_env
 
-# agent_run_state: 0=agent running w/ key; 1=agent w/o key; 2=agent not running
-agent_run_state=$(ssh-add -l >/dev/null 2>&1; echo $?)
+    # agent_run_state: 0=agent running w/ key; 1=agent w/o key; 2=agent not running
+    agent_run_state=$(ssh-add -l >/dev/null 2>&1; echo $?)
 
-if [ -z "$SSH_AUTH_SOCK" ] || [ "$agent_run_state" -eq 2 ]; then
-    agent_start
-    ssh-add
-elif [ -n "$SSH_AUTH_SOCK" ] && [ "$agent_run_state" -eq 1 ]; then
-    ssh-add
+    if [ -z "$SSH_AUTH_SOCK" ] || [ "$agent_run_state" -eq 2 ]; then
+        agent_start
+        ssh-add
+    elif [ -n "$SSH_AUTH_SOCK" ] && [ "$agent_run_state" -eq 1 ]; then
+        ssh-add
+    fi
 fi
 
 unset SSH_ENV
 
-clear
-. "$HOME/.local/share/../bin/env"
+[[ $- == *i* ]] && clear
+
+# Added by Antigravity CLI installer (PATH before tools that live here).
+export PATH="/home/lyra/.local/bin:$PATH"
+
+[ -f "$HOME/.local/share/../bin/env" ] && . "$HOME/.local/share/../bin/env"
+
+# These hooks spawn processes that can hang a non-interactive shell — guard them.
+if [[ $- == *i* ]]; then
+    command -v ruff >/dev/null 2>&1 && eval "$(ruff generate-shell-completion bash)"
+    [ -n "$XDG_CONFIG_HOME" ] && [ -f "$XDG_CONFIG_HOME/bash/source.sh" ] && . "$XDG_CONFIG_HOME/bash/source.sh"
+    command -v direnv >/dev/null 2>&1 && eval "$(direnv hook bash)"
+fi
+
+# Kiro shell integration MUST load in tool shells too — it emits the
+# command-completion markers the runner needs. Do not guard behind interactivity.
+if [[ "$TERM_PROGRAM" == "kiro" ]]; then
+    unset PROMPT_COMMAND   # clears the whole array; PROMPT_COMMAND="" only clears index 0
+    PS0=" "
+fi
+
+[[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path bash)"

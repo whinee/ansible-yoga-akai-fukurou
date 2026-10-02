@@ -87,8 +87,16 @@
 - name: If we got 200, extract asset URL; if 304, use previously cached URL
   set_fact:
     "{{ item.item.name | replace('-', '_') }}_url": >-
-      {{ (item.json.assets | selectattr('name','match','.*x86_64.*rpm$') | map(attribute='browser_download_url') | list | last) if item.status == 200 else (lookup('file', '{{ target_home }}/.local/share/{{ target_user }}-ansible/cache/github-releases/{{ item.item.name }}.url', errors='ignore') | default('')) }}
+      {%- set rx = item.item.asset_regex | default('.*x86_64.*rpm$') -%}
+      {%- if item.status == 200 -%}
+        {%- set urls = item.json.assets | selectattr('name', 'match', rx) | map(attribute='browser_download_url') | list -%}
+        {{ (urls | first if item.item.pick | default('last') == 'first' else urls | last) if urls else '' }}
+      {%- else -%}
+        {{ lookup('file', target_home ~ '/.local/share/' ~ target_user ~ '-ansible/cache/github-releases/' ~ item.item.name ~ '.url', errors='ignore') }}
+      {%- endif -%}
   loop: "{{ release_resp.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
 
 - name: Build cached_urls list
   set_fact:
