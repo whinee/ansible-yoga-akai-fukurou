@@ -1,7 +1,3 @@
-if [ -z "$WAYLAND_DISPLAY" ] && [ -n "$XDG_VTNR" ] && [ "$XDG_VTNR" -eq 1 ] ; then
-    exec sway
-fi
-
 pgrep xfsettingsd || xfsettingsd >/dev/null 2>&1 &
 
 export TERM=xterm

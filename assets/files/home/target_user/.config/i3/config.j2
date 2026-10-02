@@ -39,6 +39,11 @@ exec --no-startup-id dunst
 
 exec --no-startup-id brightnessctl set 96000
 
+{% set primary_monitor = {
+  "cezanne-shiroi-neko": "HDMI-A-0",
+  "yoga-akai-neko": "eDP-1",
+} %}
+
 {% if ansible_hostname == "yoga-akai-neko" %}
 exec --no-startup-id xrandr --output eDP-1 --primary --mode 1920x1200 --pos 0x0 --rotate normal --dpi 220
 {% elif ansible_hostname == "cezanne-shiroi-neko" %}
@@ -208,9 +213,9 @@ bar {
         inactive_workspace #333333 #222222 #888888
         urgent_workspace   #2f343a #900000 #ffffff
     }
-    output HDMI-A-0
     status_command i3status
-    tray_output HDMI-A-0
+    output {{ primary_monitor.get(ansible_hostname, "HDMI-A-0") }}
+    tray_output {{ primary_monitor.get(ansible_hostname, "HDMI-A-0") }}
 }
 
 client.focused          #363b54 #363b54 #f5abfc #bfb3ff   #363b54

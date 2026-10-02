@@ -41,6 +41,11 @@
         dest: "{{ target_home }}/.profile"
         mode: '0644'
 
+      - src: assets/files/home/target_user/.config/rofi/   # trailing slash matters!
+        dest: "{{ target_home }}/.config/rofi"
+        mode: '0644'
+        directory_mode: '0755'
+
       # - src: assets/files/home/target_user/.gitconfig
       #   dest: "{{ target_home }}/.gitconfig"
       #   mode: '0644'
@@ -151,6 +156,7 @@
       - pipx
       - playerctl
       - rclone
+      - rofi
       - rust
       - cargo
       - scrcpy
@@ -332,6 +338,7 @@
             src: "{{ item.src }}"
             dest: "{{ item.dest | expanduser }}"
             mode: "{{ item.mode }}"
+            directory_mode: "{{ item.directory_mode | default('0755') }}"
             owner: "{{ item.owner | default(target_user) }}"
             group: "{{ item.group | default(target_user) }}"
           when: item.type | default('copy') == 'copy'
